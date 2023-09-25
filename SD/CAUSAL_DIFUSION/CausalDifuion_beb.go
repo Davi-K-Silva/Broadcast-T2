@@ -13,6 +13,7 @@ package CausalOrderBroadcast
 
 import (
 	"fmt"
+	"strconv"
 
 	PP2PLink "SD/PP2PLink"
 )
@@ -76,16 +77,29 @@ func (module *COBEB_Module) Start() {
 	}()
 }
 
-func handleBroadcast(module *COBEB_Module) {
-
-}
-
-func (module *COBEB_Module) Broadcast(message BestEffortBroadcast_Req_Message) {
-
+func (module *COBEB_Module) handleBroadcast(message BestEffortBroadcast_Req_Message) {
 	W := module.V
 	W[module.id] = module.lsn
 	module.lsn = module.lsn + 1
-	message.W[0] = 1
+	message.W = W
+	message.Message = strconv.Itoa(module.id)
+	module.Broadcast(message)
+}
+
+func (module *COBEB_Module) handleIndication(message BestEffortBroadcast_Ind_Message) {
+	module.pending = append(module.pending, message)
+	for _, msg := range module.pending {
+		fromId, _ := strconv.Atoi(msg.Message)
+		for clockIndex, _ := range msg.W {
+			if msg.W[clockIndex] <= module.V[clockIndex] {
+				module.V[fromId] = module.V[fromId] + 1
+				module.Deliver(msg)
+			}
+		}
+	}
+}
+
+func (module *COBEB_Module) Broadcast(message BestEffortBroadcast_Req_Message) {
 
 	for i := 0; i < len(message.Addresses); i++ {
 		msg := BEB2PP2PLink(message)
