@@ -18,21 +18,21 @@ import (
 	PP2PLink "SD/PP2PLink"
 )
 
-type BestEffortBroadcast_Req_Message struct {
+type COBeB_Req_Message struct {
 	Addresses []string
 	W         []int
 	Message   string
 }
 
-type BestEffortBroadcast_Ind_Message struct {
+typeCOBeB_Ind_Message struct {
 	From    string
 	W       []int
 	Message string
 }
 
 type COBEB_Module struct {
-	Ind      chan BestEffortBroadcast_Ind_Message
-	Req      chan BestEffortBroadcast_Req_Message
+	Ind      chanCOBeB_Ind_Message
+	Req      chan COBeB_Req_Message
 	id       int
 	V        []int
 	lsn      int
@@ -77,7 +77,7 @@ func (module *COBEB_Module) Start() {
 	}()
 }
 
-func (module *COBEB_Module) handleBroadcast(message BestEffortBroadcast_Req_Message) {
+func (module *COBEB_Module) handleBroadcast(message COBeB_Req_Message) {
 	W := module.V
 	W[module.id] = module.lsn
 	module.lsn = module.lsn + 1
@@ -86,7 +86,7 @@ func (module *COBEB_Module) handleBroadcast(message BestEffortBroadcast_Req_Mess
 	module.Broadcast(message)
 }
 
-func (module *COBEB_Module) handleIndication(message BestEffortBroadcast_Ind_Message) {
+func (module *COBEB_Module) handleIndication(messageCOBeB_Ind_Message) {
 	module.pending = append(module.pending, message)
 	for _, msg := range module.pending {
 		fromId, _ := strconv.Atoi(msg.Message)
@@ -99,7 +99,7 @@ func (module *COBEB_Module) handleIndication(message BestEffortBroadcast_Ind_Mes
 	}
 }
 
-func (module *COBEB_Module) Broadcast(message BestEffortBroadcast_Req_Message) {
+func (module *COBEB_Module) Broadcast(message COBeB_Req_Message) {
 
 	for i := 0; i < len(message.Addresses); i++ {
 		msg := BEB2PP2PLink(message)
@@ -109,14 +109,14 @@ func (module *COBEB_Module) Broadcast(message BestEffortBroadcast_Req_Message) {
 	}
 }
 
-func (module *COBEB_Module) Deliver(message BestEffortBroadcast_Ind_Message) {
+func (module *COBEB_Module) Deliver(messageCOBeB_Ind_Message) {
 
 	// fmt.Println("Received '" + message.Message + "' from " + message.From)
 	module.Ind <- message
 	// fmt.Println("# End BEB Received")
 }
 
-func BEB2PP2PLink(message BestEffortBroadcast_Req_Message) PP2PLink.PP2PLink_Req_Message {
+func BEB2PP2PLink(message COBeB_Req_Message) PP2PLink.PP2PLink_Req_Message {
 
 	return PP2PLink.PP2PLink_Req_Message{
 		To:      message.Addresses[0],
@@ -124,9 +124,9 @@ func BEB2PP2PLink(message BestEffortBroadcast_Req_Message) PP2PLink.PP2PLink_Req
 
 }
 
-func PP2PLink2BEB(message PP2PLink.PP2PLink_Ind_Message) BestEffortBroadcast_Ind_Message {
+func PP2PLink2BEB(message PP2PLink.PP2PLink_Ind_Message)COBeB_Ind_Message {
 
-	return BestEffortBroadcast_Ind_Message{
+	returnCOBeB_Ind_Message{
 		From:    message.From,
 		Message: message.Message}
 }
@@ -143,11 +143,11 @@ func main() {
 	fmt.Println(addresses)
 
 	mod := COBEB_Module{
-		Req: make(chan BestEffortBroadcast_Req_Message),
-		Ind: make(chan BestEffortBroadcast_Ind_Message) }
+		Req: make(chan COBeB_Req_Message),
+		Ind: make(chanCOBeB_Ind_Message) }
 	mod.Init(addresses[0])
 
-	msg := BestEffortBroadcast_Req_Message{
+	msg := COBeB_Req_Message{
 		Addresses: addresses,
 		Message: "BATATA!" }
 
