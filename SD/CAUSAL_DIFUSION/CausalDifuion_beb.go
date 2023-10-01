@@ -18,7 +18,7 @@ import (
 	"os"
 	"bufio"
 
-	PP2PLink "SD/PP2PLink"
+	BestEffortBroadcast "SD/BEB"
 )
 
 type COBeB_Req_Message struct {
@@ -40,7 +40,7 @@ type COBEB_Module struct {
 	V        []int
 	lsn      int //sequence number
 	pending  []COBeB_Ind_Message
-	Pp2plink *PP2PLink.PP2PLink
+	BEB	     *BestEffortBroadcast.BestEffortBroadcast_Module
 	dbg      bool
 }
 
@@ -57,7 +57,7 @@ func (module *COBEB_Module) Init(address string, id int, count int) {
 func (module *COBEB_Module) InitD(address string, id int, _dbg bool, count int) {
 	module.dbg = _dbg
 	module.outDbg("Init COBEB!")
-	module.Pp2plink = PP2PLink.NewPP2PLink(address, _dbg)
+	module.BEB = BestEffortBroadcast.NewBEB(address, _dbg)
 	module.id = id
 	module.lsn = 0
 	module.V = make([]int, count)
@@ -106,9 +106,8 @@ func (module *COBEB_Module) handleIndication(message COBeB_Ind_Message) {
 func (module *COBEB_Module) Broadcast(message COBeB_Req_Message) {
 
 	for i := 0; i < len(message.Addresses); i++ {
-		msg := COBEBReq2PP2PLinkReq(message)
-		msg.To = message.Addresses[i]
-		module.Pp2plink.Req <- msg
+		msg := COBEBReq2BEBReq(message)
+		module.BEB.Broadcast(msg)
 		module.outDbg("Sent to " + message.Addresses[i])
 	}
 }
@@ -120,10 +119,10 @@ func (module *COBEB_Module) Deliver(message COBeB_Ind_Message) {
 	// fmt.Println("# End BEB Received")
 }
 
-func COBEBReq2PP2PLinkReq(message COBeB_Req_Message) PP2PLink.PP2PLink_Req_Message {
+func COBEBReq2BEBReq(message COBeB_Req_Message) BestEffortBroadcast.BestEffortBroadcast_Req_Message {
 
-	return PP2PLink.PP2PLink_Req_Message{
-		To:      message.Addresses[0],
+	return BestEffortBroadcast.BestEffortBroadcast_Req_Message {
+		Addresses:      message.Addresses,
 		Message: message.Message}
 
 }
