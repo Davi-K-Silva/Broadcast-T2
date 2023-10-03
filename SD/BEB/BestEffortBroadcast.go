@@ -6,6 +6,7 @@
     Christian Cachin, Rachid Gerraoui, Luis Rodrigues
   * Semestre 2018/2 - Primeira versao.  Estudantes:  Andre Antonitsch e Rafael Copstein
   Para uso vide ao final do arquivo, ou aplicacao chat.go que usa este
+ // go run CausalDifuion_beb.go 0 127.0.0.1:5001  127.0.0.1:6001  127.0.0.1:7001 -> para testar, 3 terminais, com o parametro 0 e o ultimo de cada end. diferente
 */
 package BestEffortBroadcast
 
@@ -97,6 +98,17 @@ func PP2PLink2BEB(message PP2PLink.PP2PLink_Ind_Message) BestEffortBroadcast_Ind
 	return BestEffortBroadcast_Ind_Message{
 		From:    message.From,
 		Message: message.Message}
+}
+
+func NewBEB(_address string, _dbg bool) *BestEffortBroadcast_Module {
+	beb := &BestEffortBroadcast_Module{
+		Req:   make(chan BestEffortBroadcast_Req_Message, 1),
+		Ind:   make(chan BestEffortBroadcast_Ind_Message, 1),
+		dbg:   _dbg,
+		Pp2plink: nil}
+	beb.outDbg(" Init BestEffortBroadcast!")
+	beb.Init(_address)
+	return beb
 }
 
 /*

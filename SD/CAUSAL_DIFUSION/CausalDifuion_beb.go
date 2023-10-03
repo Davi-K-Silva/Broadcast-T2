@@ -9,35 +9,38 @@ Modulo representando Berst Effort Broadcast tal como definido em:
 * Semestre 2018/2 - Primeira versao.  Estudantes:  Andre Antonitsch e Rafael Copstein
 Para uso vide ao final do arquivo, ou aplicacao chat.go que usa este
 */
-package CausalOrderBroadcast
+//package CausalOrderBroadcast
+package main
 
 import (
 	"fmt"
 	"strconv"
+	"os"
+	"bufio"
 
-	PP2PLink "SD/PP2PLink"
+	BestEffortBroadcast "SD/BEB"
 )
 
 type COBeB_Req_Message struct {
 	Addresses []string
-	W         []int
+	W         []int//rel. vet
 	Message   string
 }
 
-typeCOBeB_Ind_Message struct {
+type COBeB_Ind_Message struct {
 	From    string
 	W       []int
 	Message string
 }
 
 type COBEB_Module struct {
-	Ind      chanCOBeB_Ind_Message
+	Ind      chan COBeB_Ind_Message
 	Req      chan COBeB_Req_Message
 	id       int
 	V        []int
-	lsn      int
-	pending  []BestEffortBroadcast_Ind_Message
-	Pp2plink *PP2PLink.PP2PLink
+	lsn      int //sequence number
+	pending  []COBeB_Ind_Message
+	BEB	     *BestEffortBroadcast.BestEffortBroadcast_Module
 	dbg      bool
 }
 
@@ -47,17 +50,18 @@ func (module *COBEB_Module) outDbg(s string) {
 	}
 }
 
-func (module *COBEB_Module) Init(address string, id int) {
-	module.InitD(address, id, true)
+func (module *COBEB_Module) Init(address string, id int, count int) {
+	module.InitD(address, id, true, count)
 }
 
-func (module *COBEB_Module) InitD(address string, id int, _dbg bool) {
+func (module *COBEB_Module) InitD(address string, id int, _dbg bool, count int) {
 	module.dbg = _dbg
 	module.outDbg("Init COBEB!")
-	module.Pp2plink = PP2PLink.NewPP2PLink(address, _dbg)
+	module.BEB = BestEffortBroadcast.NewBEB(address, _dbg)
 	module.id = id
 	module.lsn = 0
-	for i := 0; i < len(module.V); i++ {
+	module.V = make([]int, count)
+	for i := 0; i < count; i++ {
 		module.V[i] = 0
 	}
 	module.Start()
@@ -69,9 +73,9 @@ func (module *COBEB_Module) Start() {
 		for {
 			select {
 			case y := <-module.Req:
-				module.Broadcast(y)
-			case y := <-module.Pp2plink.Ind:
-				module.Deliver(PP2PLink2BEB(y))
+				module.handleBroadcast(y)
+			case y := <-module.Ind:
+				module.handleIndication(y)
 			}
 		}
 	}()
@@ -86,7 +90,7 @@ func (module *COBEB_Module) handleBroadcast(message COBeB_Req_Message) {
 	module.Broadcast(message)
 }
 
-func (module *COBEB_Module) handleIndication(messageCOBeB_Ind_Message) {
+func (module *COBEB_Module) handleIndication(message COBeB_Ind_Message) {
 	module.pending = append(module.pending, message)
 	for _, msg := range module.pending {
 		fromId, _ := strconv.Atoi(msg.Message)
@@ -102,36 +106,27 @@ func (module *COBEB_Module) handleIndication(messageCOBeB_Ind_Message) {
 func (module *COBEB_Module) Broadcast(message COBeB_Req_Message) {
 
 	for i := 0; i < len(message.Addresses); i++ {
-		msg := BEB2PP2PLink(message)
-		msg.To = message.Addresses[i]
-		module.Pp2plink.Req <- msg
+		msg := COBEBReq2BEBReq(message)
+		module.BEB.Broadcast(msg)
 		module.outDbg("Sent to " + message.Addresses[i])
 	}
 }
 
-func (module *COBEB_Module) Deliver(messageCOBeB_Ind_Message) {
+func (module *COBEB_Module) Deliver(message COBeB_Ind_Message) {
 
 	// fmt.Println("Received '" + message.Message + "' from " + message.From)
 	module.Ind <- message
 	// fmt.Println("# End BEB Received")
 }
 
-func BEB2PP2PLink(message COBeB_Req_Message) PP2PLink.PP2PLink_Req_Message {
+func COBEBReq2BEBReq(message COBeB_Req_Message) BestEffortBroadcast.BestEffortBroadcast_Req_Message {
 
-	return PP2PLink.PP2PLink_Req_Message{
-		To:      message.Addresses[0],
+	return BestEffortBroadcast.BestEffortBroadcast_Req_Message {
+		Addresses:      message.Addresses,
 		Message: message.Message}
 
 }
 
-func PP2PLink2BEB(message PP2PLink.PP2PLink_Ind_Message)COBeB_Ind_Message {
-
-	returnCOBeB_Ind_Message{
-		From:    message.From,
-		Message: message.Message}
-}
-
-/*
 func main() {
 
 	if (len(os.Args) < 2) {
@@ -139,20 +134,23 @@ func main() {
 		return
 	}
 
-	addresses := os.Args[1:]
+	id, _ := strconv.Atoi(os.Args[1])
+	addresses := os.Args[2:]
 	fmt.Println(addresses)
 
 	mod := COBEB_Module{
 		Req: make(chan COBeB_Req_Message),
-		Ind: make(chanCOBeB_Ind_Message) }
-	mod.Init(addresses[0])
+		Ind: make(chan COBeB_Ind_Message) }
+	mod.Init(addresses[id], id, len(addresses))
 
 	msg := COBeB_Req_Message{
 		Addresses: addresses,
 		Message: "BATATA!" }
 
 	yy := make(chan string)
+	input:= bufio.NewScanner(os.Stdin)//esperar
+	input.Scan()
 	mod.Req <- msg
 	<- yy
 }
-*/
+
