@@ -98,12 +98,16 @@ func BEB2PP2PLink(message BookBestEffortBroadcast_Req_Message, toId int, address
 }
 
 func PP2PLink2BEB(message PP2PLink.PP2PLink_Ind_Message, addresses []string) BookBestEffortBroadcast_Ind_Message {
+
+	// * from here *	Not Working but ok
 	fromID := 0
 	for i := 0; i < len(addresses); i++ {
+		//fmt.Println(message.From + " - " + addresses[i])
 		if addresses[i] == message.From {
 			fromID = i
 		}
 	}
+	// * to here *
 
 	return BookBestEffortBroadcast_Ind_Message{
 		From:    fromID,
@@ -112,11 +116,12 @@ func PP2PLink2BEB(message PP2PLink.PP2PLink_Ind_Message, addresses []string) Boo
 
 func NewBookBEB(_id int, _addresses []string, _dbg bool) *BookBestEffortBroadcast_Module {
 	beb := &BookBestEffortBroadcast_Module{
-		Req: make(chan BookBestEffortBroadcast_Req_Message, 1),
-		Ind: make(chan BookBestEffortBroadcast_Ind_Message, 1),
-
-		dbg:      _dbg,
-		Pp2plink: nil}
+		Req:       make(chan BookBestEffortBroadcast_Req_Message, 1),
+		Ind:       make(chan BookBestEffortBroadcast_Ind_Message, 1),
+		id:        _id,
+		addresses: _addresses,
+		dbg:       _dbg,
+		Pp2plink:  nil}
 	beb.outDbg(" Init BestEffortBroadcast!")
 	beb.Init(_id, _addresses)
 	return beb
