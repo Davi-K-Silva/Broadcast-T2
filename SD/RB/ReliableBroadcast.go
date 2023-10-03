@@ -1,19 +1,20 @@
 /*
-  Construido como parte da disciplina: Sistemas Distribuidos - PUCRS - Escola Politecnica
-  Professor: Fernando Dotti  (https://fldotti.github.io/)
-  Modulo representando Berst Effort Broadcast tal como definido em:
-    Introduction to Reliable and Secure Distributed Programming
-    Christian Cachin, Rachid Gerraoui, Luis Rodrigues
-  * Semestre 2018/2 - Primeira versao.  Estudantes:  Andre Antonitsch e Rafael Copstein
-  Para uso vide ao final do arquivo, ou aplicacao chat.go que usa este
+Construido como parte da disciplina: Sistemas Distribuidos - PUCRS - Escola Politecnica
+Professor: Fernando Dotti  (https://fldotti.github.io/)
+Modulo representando Berst Effort Broadcast tal como definido em:
+
+	Introduction to Reliable and Secure Distributed Programming
+	Christian Cachin, Rachid Gerraoui, Luis Rodrigues
+
+* Semestre 2018/2 - Primeira versao.  Estudantes:  Andre Antonitsch e Rafael Copstein
+Para uso vide ao final do arquivo, ou aplicacao chat.go que usa este
 */
 package ReliableBroadcast
 
 import (
 	"fmt"
 
-	BestEffortBroadcast "SD/BEB"
-	PP2PLink "SD/PP2PLink"
+	BookBestEffortBroadcast "SD/BookBEB"
 )
 
 type RB_Req_Message struct {
@@ -22,18 +23,18 @@ type RB_Req_Message struct {
 }
 
 type RB_Ind_Message struct {
-	From    string
+	From    int
 	Message string
 }
 
 type ReliableBroadcast_Module struct {
-	Ind      chan RB_Ind_Message
-	Req      chan RB_Req_Message
-	BEB	     *BestEffortBroadcast.BestEffortBroadcast_Module
-	id 		 int
-	delivered []string 
-	Pp2plink *PP2PLink.PP2PLink
-	dbg      bool
+	Ind       chan RB_Ind_Message
+	Req       chan RB_Req_Message
+	BookBEB   *BookBestEffortBroadcast.BookBestEffortBroadcast_Module
+	id        int
+	delivered []string
+
+	dbg bool
 }
 
 func (module *ReliableBroadcast_Module) outDbg(s string) {
@@ -42,16 +43,15 @@ func (module *ReliableBroadcast_Module) outDbg(s string) {
 	}
 }
 
-func (module *ReliableBroadcast_Module) Init(address string, id int) {
-	module.InitD(address, id int, true)
+func (module *ReliableBroadcast_Module) Init(addresses []string, id int) {
+	module.InitD(addresses, id, true)
 }
 
-func (module *ReliableBroadcast_Module) InitD(address string, id int, _dbg bool) {
+func (module *ReliableBroadcast_Module) InitD(addresses []string, id int, _dbg bool) {
 	module.dbg = _dbg
 	module.outDbg("Init RB!")
 	module.id = id
-	module.Pp2plink = PP2PLink.NewPP2PLink(address, _dbg)
-	module.BEB = BestEffortBroadcast.NewBEB(address, _dbg)
+	module.BookBEB = BookBestEffortBroadcast.NewBookBEB(id, addresses, _dbg)
 	module.Start()
 }
 
@@ -62,47 +62,55 @@ func (module *ReliableBroadcast_Module) Start() {
 			select {
 			case y := <-module.Req:
 				module.Broadcast(y)
-			case y := <-module.Pp2plink.Ind:
-				module.Deliver(PP2PLink2BEB(y))
+			case y := <-module.BookBEB.Ind:
+				module.HandleDeliver(y)
 			}
 		}
 	}()
 }
 
 func (module *ReliableBroadcast_Module) Broadcast(message RB_Req_Message) {
+	module.BookBEB.Broadcast(RBReq2BEBReq(message))
+}
 
-	// aqui acontece o envio um opara um, para cada processo destinatario
-	// em caso de injecao de falha no originador, no meio de um broadcast
-	// este loop deve ser interrompido, tendo a mensagem ido para alguns mas nao para todos processos
-
-	for i := 0; i < len(message.Addresses); i++ {
-		msg := BEB2PP2PLink(message)
-		msg.To = message.Addresses[i]
-		module.Pp2plink.Req <- msg
-		module.outDbg("Sent to " + message.Addresses[i])
+func (module *ReliableBroadcast_Module) HandleDeliver(message BookBestEffortBroadcast.BookBestEffortBroadcast_Ind_Message) {
+	if !stringInSlice(message.Message, module.delivered) {
+		module.delivered = append(module.delivered, message.Message)
+		module.Deliver(BEB2RBInd(message))
+		module.BookBEB.Req <- BookBestEffortBroadcast.BookBestEffortBroadcast_Req_Message{
+			Message: message.Message}
 	}
 }
 
-func (module *ReliableBroadcast_Module) Deliver(message R_Ind_Message) {
+func (module *ReliableBroadcast_Module) Deliver(message RB_Ind_Message) {
 
 	// fmt.Println("Received '" + message.Message + "' from " + message.From)
 	module.Ind <- message
-	// fmt.Println("# End BEB Received")
+	// fmt.Println("# End BookBEB Received")
 }
 
-func BEB2PP2PLink(message BestEffortBroadcast_Req_Message) PP2PLink.PP2PLink_Req_Message {
+func RBReq2BEBReq(message RB_Req_Message) BookBestEffortBroadcast.BookBestEffortBroadcast_Req_Message {
 
-	return PP2PLink.PP2PLink_Req_Message{
-		To:      message.Addresses[0],
+	return BookBestEffortBroadcast.BookBestEffortBroadcast_Req_Message{
 		Message: message.Message}
 
 }
 
-func PP2PLink2BEB(message PP2PLink.PP2PLink_Ind_Message) BestEffortBroadcast_Ind_Message {
+func BEB2RBInd(message BookBestEffortBroadcast.BookBestEffortBroadcast_Ind_Message) RB_Ind_Message {
 
-	return BestEffortBroadcast_Ind_Message{
+	return RB_Ind_Message{
 		From:    message.From,
 		Message: message.Message}
+
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
 
 /*
