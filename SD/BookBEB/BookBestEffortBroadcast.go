@@ -13,6 +13,8 @@ package BookBestEffortBroadcast
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	PP2PLink "SD/PP2PLink"
 )
@@ -73,12 +75,16 @@ func (module *BookBestEffortBroadcast_Module) Broadcast(message BookBestEffortBr
 	// este loop deve ser interrompido, tendo a mensagem ido para alguns mas nao para todos processos
 
 	for i := 0; i < len(module.addresses); i++ {
-		if i != module.id {
-			msg := BEB2PP2PLink(message, i, module.addresses)
-			//msg.To = module.addresses[i]
-			module.Pp2plink.Req <- msg
-			module.outDbg("Sent to " + module.addresses[i])
+
+		if strings.Contains(message.Message, "D#") && i != module.id {
+			time.Sleep(5 * time.Second)
 		}
+		msg := BEB2PP2PLink(message, i, module.addresses)
+		//msg.To = module.addresses[i]
+
+		module.Pp2plink.Req <- msg
+		module.outDbg("Sent to " + module.addresses[i])
+
 	}
 }
 
@@ -123,7 +129,7 @@ func NewBookBEB(_id int, _addresses []string, _dbg bool) *BookBestEffortBroadcas
 		dbg:       _dbg,
 		Pp2plink:  nil}
 	beb.outDbg(" Init BestEffortBroadcast!")
-	beb.Init(_id, _addresses)
+	beb.InitD(_id, _addresses, _dbg)
 	return beb
 }
 

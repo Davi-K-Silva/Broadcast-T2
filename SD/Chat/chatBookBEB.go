@@ -35,7 +35,7 @@ func main() {
 	myId, _ := strconv.Atoi(os.Args[1])
 	fmt.Println(addresses[myId])
 
-	beb := NewBookBEB(myId, addresses, true)
+	beb := NewBookBEB(myId, addresses, false)
 
 	//beb.Init(addresses[0])
 	//beb.InitD(myId, addresses, true)
