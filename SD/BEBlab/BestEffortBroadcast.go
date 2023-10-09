@@ -1,39 +1,32 @@
 /*
-	Construido como parte da disciplina: Sistemas Distribuidos - PUCRS - Escola Politecnica
-	Professor: Fernando Dotti  (https://fldotti.github.io/)
-	Modulo representando Berst Effort Broadcast tal como definido em:
-	  Introduction to Reliable and Secure Distributed Programming
-	  Christian Cachin, Rachid Gerraoui, Luis Rodrigues
-	* Semestre 2018/2 - Primeira versao.  Estudantes:  Andre Antonitsch e Rafael Copstein
-	Para uso vide ao final do arquivo, ou aplicacao chat.go que usa este
-
-// go run CausalDifuion_beb.go 0 127.0.0.1:5001  127.0.0.1:6001  127.0.0.1:7001 -> para testar, 3 terminais, com o parametro 0 e o ultimo de cada end. diferente
+  Construido como parte da disciplina: Sistemas Distribuidos - PUCRS - Escola Politecnica
+  Professor: Fernando Dotti  (https://fldotti.github.io/)
+  Modulo representando Berst Effort Broadcast tal como definido em:
+    Introduction to Reliable and Secure Distributed Programming
+    Christian Cachin, Rachid Gerraoui, Luis Rodrigues
+  * Semestre 2018/2 - Primeira versao.  Estudantes:  Andre Antonitsch e Rafael Copstein
+  Para uso vide ao final do arquivo, ou aplicacao chat.go que usa este
+ // go run CausalDifuion_beb.go 0 127.0.0.1:5001  127.0.0.1:6001  127.0.0.1:7001 -> para testar, 3 terminais, com o parametro 0 e o ultimo de cada end. diferente
 */
 package BestEffortBroadcast
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
-	"time"
 
 	PP2PLink "SD/PP2PLink"
 )
 
 type BestEffortBroadcast_Req_Message struct {
 	Addresses []string
-	W         []int
 	Message   string
 }
 
 type BestEffortBroadcast_Ind_Message struct {
 	From    string
-	W       []int
 	Message string
 }
 
 type BestEffortBroadcast_Module struct {
-	id       int
 	Ind      chan BestEffortBroadcast_Ind_Message
 	Req      chan BestEffortBroadcast_Req_Message
 	Pp2plink *PP2PLink.PP2PLink
@@ -46,13 +39,12 @@ func (module *BestEffortBroadcast_Module) outDbg(s string) {
 	}
 }
 
-func (module *BestEffortBroadcast_Module) Init(address string, id int) {
-	module.InitD(address, id, true)
+func (module *BestEffortBroadcast_Module) Init(address string) {
+	module.InitD(address, true)
 }
 
-func (module *BestEffortBroadcast_Module) InitD(address string, id int, _dbg bool) {
+func (module *BestEffortBroadcast_Module) InitD(address string, _dbg bool) {
 	module.dbg = _dbg
-	module.id = id
 	module.outDbg("Init BEB!")
 	module.Pp2plink = PP2PLink.NewPP2PLink(address, _dbg)
 	module.Start()
@@ -64,7 +56,7 @@ func (module *BestEffortBroadcast_Module) Start() {
 		for {
 			select {
 			case y := <-module.Req:
-				go module.Broadcast(y)
+				module.Broadcast(y)
 			case y := <-module.Pp2plink.Ind:
 				module.Deliver(PP2PLink2BEB(y))
 			}
@@ -79,10 +71,6 @@ func (module *BestEffortBroadcast_Module) Broadcast(message BestEffortBroadcast_
 	// este loop deve ser interrompido, tendo a mensagem ido para alguns mas nao para todos processos
 
 	for i := 0; i < len(message.Addresses); i++ {
-
-		if strings.Contains(message.Message, "D#") && i != module.id {
-			time.Sleep(5 * time.Second)
-		}
 		msg := BEB2PP2PLink(message)
 		msg.To = message.Addresses[i]
 		module.Pp2plink.Req <- msg
@@ -92,9 +80,6 @@ func (module *BestEffortBroadcast_Module) Broadcast(message BestEffortBroadcast_
 
 func (module *BestEffortBroadcast_Module) Deliver(message BestEffortBroadcast_Ind_Message) {
 
-	arrival := strings.Split(message.Message, "@")
-	message.Message = arrival[0]
-	message.W = StringArrayToIntArray(arrival[1:])
 	// fmt.Println("Received '" + message.Message + "' from " + message.From)
 	module.Ind <- message
 	// fmt.Println("# End BEB Received")
@@ -102,11 +87,9 @@ func (module *BestEffortBroadcast_Module) Deliver(message BestEffortBroadcast_In
 
 func BEB2PP2PLink(message BestEffortBroadcast_Req_Message) PP2PLink.PP2PLink_Req_Message {
 
-	adds := strings.Join(IntArrayToStringArray(message.W), "@")
-
 	return PP2PLink.PP2PLink_Req_Message{
 		To:      message.Addresses[0],
-		Message: message.Message + "@" + adds}
+		Message: message.Message}
 
 }
 
@@ -117,42 +100,15 @@ func PP2PLink2BEB(message PP2PLink.PP2PLink_Ind_Message) BestEffortBroadcast_Ind
 		Message: message.Message}
 }
 
-func NewBEB(_address string, _id int, _dbg bool) *BestEffortBroadcast_Module {
+func NewBEB(_address string, _dbg bool) *BestEffortBroadcast_Module {
 	beb := &BestEffortBroadcast_Module{
-		Req:      make(chan BestEffortBroadcast_Req_Message, 1),
-		Ind:      make(chan BestEffortBroadcast_Ind_Message, 1),
-		dbg:      _dbg,
+		Req:   make(chan BestEffortBroadcast_Req_Message, 1),
+		Ind:   make(chan BestEffortBroadcast_Ind_Message, 1),
+		dbg:   _dbg,
 		Pp2plink: nil}
 	beb.outDbg(" Init BestEffortBroadcast!")
-	beb.Init(_address, _id)
+	beb.Init(_address)
 	return beb
-}
-
-func IntArrayToStringArray(arr []int) []string {
-	stringArray := make([]string, len(arr))
-
-	for i, v := range arr {
-		stringArray[i] = strconv.Itoa(v)
-	}
-
-	return stringArray
-
-}
-
-func StringArrayToIntArray(arr []string) []int {
-	// Initialize an empty int array
-	intArray := make([]int, len(arr))
-
-	// Convert each string to an integer and store it in the int array
-	for i, str := range arr {
-		num, err := strconv.Atoi(str)
-		if err != nil {
-			// Handle the error if the conversion fails
-		}
-		intArray[i] = num
-	}
-
-	return intArray
 }
 
 /*
