@@ -18,8 +18,7 @@ import (
 )
 
 type RB_Req_Message struct {
-	Addresses []string
-	Message   string
+	Message string
 }
 
 type RB_Ind_Message struct {
@@ -111,6 +110,19 @@ func stringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func NewRB(_id int, _addresses []string, _dbg bool) *ReliableBroadcast_Module {
+
+	rb := &ReliableBroadcast_Module{
+		Req: make(chan RB_Req_Message, 1),
+		Ind: make(chan RB_Ind_Message, 1),
+		id:  _id,
+		dbg: _dbg,
+	}
+	rb.outDbg(" Init Reliable Broadcast")
+	rb.InitD(_addresses, _id, _dbg)
+	return rb
 }
 
 /*
